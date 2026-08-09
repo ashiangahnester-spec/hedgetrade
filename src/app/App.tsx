@@ -17,6 +17,10 @@ import './app-root.scss';
 const Layout = lazy(() => import('../components/layout'));
 const AppRoot = lazy(() => import('./app-root'));
 
+// HedgeTrade Market Analysis is an additional isolated page.
+// It does not replace or modify the existing Deriv app.
+const MarketAnalysis = lazy(() => import('../pages/market-analysis'));
+
 /**
  * Component wrapper to handle language URL parameter
  * Uses the useLanguageFromURL hook to process language switching
@@ -54,10 +58,23 @@ const router = createBrowserRouter(
                 </Suspense>
             }
         >
-            {/* All child routes will be passed as children to Layout */}
+            {/* Existing HedgeTrade / Deriv application */}
             <Route index element={<AppRoot />} />
-            {/* App Builder embeds the template at /preview — render the same app shell */}
+
+            {/* Existing App Builder preview route */}
             <Route path='preview' element={<AppRoot />} />
+
+            {/* New isolated HedgeTrade Market Analysis page */}
+            <Route
+                path='market-analysis'
+                element={
+                    <Suspense
+                        fallback={<ChunkLoader message={localize('Loading Market Analysis...')} />}
+                    >
+                        <MarketAnalysis />
+                    </Suspense>
+                }
+            />
         </Route>
     ),
     { basename: routerBasename }
@@ -67,8 +84,8 @@ const router = createBrowserRouter(
  * Main App component
  *
  * Responsibilities:
- * 1. OAuth callback handling (via vendored deriv-core handleOAuthCallback)
- * 2. Account switching from URL (via useAccountSwitching hook)
+ * 1. OAuth callback handling
+ * 2. Account switching from URL
  * 3. Router provider setup
  */
 function App() {
@@ -77,6 +94,7 @@ function App() {
 
     React.useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
+
         if (!urlParams.has('code')) return;
 
         const handleCallback = async () => {
@@ -88,17 +106,24 @@ function App() {
                 });
 
                 const { DerivWSAccountsService } = await import('@/services/derivws-accounts.service');
+
                 const accounts = await DerivWSAccountsService.fetchAccountsList(authInfo.access_token);
 
                 if (accounts && accounts.length > 0) {
                     DerivWSAccountsService.storeAccounts(accounts);
+
                     const firstAccount = accounts[0];
+
                     localStorage.setItem('active_loginid', firstAccount.account_id);
+
                     const isDemo =
-                        firstAccount.account_id.startsWith('VRT') || firstAccount.account_id.startsWith('VRTC');
+                        firstAccount.account_id.startsWith('VRT') ||
+                        firstAccount.account_id.startsWith('VRTC');
+
                     localStorage.setItem('account_type', isDemo ? 'demo' : 'real');
 
                     const { api_base } = await import('@/external/bot-skeleton');
+
                     await api_base.init(true);
                 } else {
                     console.error('No accounts returned after authentication');
